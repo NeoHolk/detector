@@ -1,4 +1,202 @@
 {
-  "timestamp": "2026-03-02T00:00:00.000Z",
-  "services": []
+  "lastCheckTime": "2026-03-02T07:08:04.147Z",
+  "currentServices": [
+    {
+      "serviceName": "Account : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Pay Production Instance : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "APNS : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Pay Sandbox Instance : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "APNS Sandbox : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Podcasts Connect : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Attest : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Certificates, Identifiers & Profiles : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - Advanced Commerce API : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "CloudKit Console : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - In-App Purchases : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "CloudKit Database : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - Receipt Verification : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Code-level Support : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - Sandbox : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Contact Us : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - Server APIs : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Developer Documentation : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store - Server Notifications : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Developer ID Notary Service : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Automatic App Updates : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Device Enrollment Program : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Feedback Assistant : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect - Analytics : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "MapKit JS Dashboard : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect - App Processing  : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "MFi Portal : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect - App Upload : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "News Publisher : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect - Sales and Trends : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "NFC & SE Platform : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect - TestFlight : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Program Enrollment and Renewals : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "App Store Connect API : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "SKAdNetwork : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Developer Forums : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Software Downloads : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Maps API : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Tap to Pay on iPhone : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Music API : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Videos : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Music Connect : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "WeatherKit : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Music for Artists : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Xcode Automatic Configuration : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple News API : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Xcode Cloud : available",
+      "status": "operational"
+    },
+    {
+      "serviceName": "Apple Pay Developer | Apple Pay Demo : available",
+      "status": "operational"
+    }
+  ],
+  "changeHistory": []
 }

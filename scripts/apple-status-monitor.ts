@@ -11,9 +11,15 @@ interface Service {
   status: 'operational' | 'degraded' | 'down' | 'unknown';
 }
 
-interface HistoryData {
+interface ChangeRecord {
   timestamp: string;
-  services: Service[];
+  changes: ServiceDiff[];
+}
+
+interface HistoryData {
+  lastCheckTime: string;
+  currentServices: Service[];
+  changeHistory: ChangeRecord[];
 }
 
 interface ServiceDiff {
@@ -91,7 +97,18 @@ function readHistoryData(): HistoryData | null {
   try {
     if (fs.existsSync(dataPath)) {
       const content = fs.readFileSync(dataPath, 'utf-8');
-      return JSON.parse(content);
+      const data = JSON.parse(content);
+      
+      // 兼容旧格式
+      if (data.timestamp && data.services && !data.lastCheckTime) {
+        return {
+          lastCheckTime: data.timestamp,
+          currentServices: data.services,
+          changeHistory: []
+        };
+      }
+      
+      return data;
     }
   } catch (error) {
     console.warn('[存储] 读取历史数据失败:', error instanceof Error ? error.message : String(error));
@@ -99,23 +116,54 @@ function readHistoryData(): HistoryData | null {
   return null;
 }
 
-// 保存当前数据
-function saveHistoryData(services: Service[]): void {
+// 保存当前数据（只在有差异时调用）
+function saveHistoryData(services: Service[], diffs: ServiceDiff[]): void {
   const dataPath = path.join(process.cwd(), 'data', 'apple.json');
-  const data: HistoryData = {
-    timestamp: new Date().toISOString(),
-    services,
-  };
+  const now = new Date().toISOString();
   
   try {
+    // 读取现有数据
+    let historyData: HistoryData = {
+      lastCheckTime: now,
+      currentServices: services,
+      changeHistory: []
+    };
+    
+    if (fs.existsSync(dataPath)) {
+      const existingData = readHistoryData();
+      if (existingData) {
+        historyData.changeHistory = existingData.changeHistory || [];
+      }
+    }
+    
+    // 只有当有差异时才添加变更记录
+    if (diffs.length > 0) {
+      historyData.changeHistory.push({
+        timestamp: now,
+        changes: diffs
+      });
+      
+      // 限制历史记录数量，避免文件过大（保留最近100条变更记录）
+      if (historyData.changeHistory.length > 100) {
+        historyData.changeHistory = historyData.changeHistory.slice(-100);
+      }
+    }
+    
+    // 更新当前状态和检查时间
+    historyData.lastCheckTime = now;
+    historyData.currentServices = services;
+    
     // 确保目录存在
     const dir = path.dirname(dataPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(dataPath, JSON.stringify(historyData, null, 2), 'utf-8');
     console.log(`[存储] ✅ 数据已保存到 ${dataPath}`);
+    if (diffs.length > 0) {
+      console.log(`[存储] 📝 新增变更记录: ${diffs.length} 个服务状态变化`);
+    }
   } catch (error) {
     console.error('[存储] ❌ 保存数据失败:', error instanceof Error ? error.message : String(error));
   }
@@ -336,7 +384,8 @@ async function main() {
     // 读取历史数据
     const historyData = readHistoryData();
     if (historyData) {
-      console.log(`[存储] 📁 读取到历史数据 (${new Date(historyData.timestamp).toLocaleString('zh-CN')})`);
+      console.log(`[存储] 📁 读取到历史数据 (上次检查: ${new Date(historyData.lastCheckTime).toLocaleString('zh-CN')})`);
+      console.log(`[存储] 📊 历史变更记录: ${historyData.changeHistory.length} 条`);
     } else {
       console.log('[存储] 📁 未找到历史数据，这是首次运行');
     }
@@ -362,24 +411,37 @@ async function main() {
     console.log(`  ❓ 未知: ${stats.unknown}\n`);
 
     // 对比历史数据,检测差异
-    if (historyData && historyData.services) {
-      const diffs = diffServices(historyData.services, services);
-      
-      if (diffs.length > 0) {
-        console.log(`[对比] 🔍 检测到 ${diffs.length} 个服务状态变化`);
-        diffs.forEach(diff => {
-          console.log(`  - ${diff.serviceName}: ${diff.oldStatus} ➜ ${diff.newStatus}`);
-        });
-        
-        // 发送差异通知
-        await pushDiffNotification(webhookUrl, diffs);
+    let diffs: ServiceDiff[] = [];
+    if (historyData && historyData.currentServices) {
+      // 如果历史数据的服务列表为空，说明是首次有数据，需要保存
+      if (historyData.currentServices.length === 0 && services.length > 0) {
+        console.log('[存储] 📝 检测到首次有效数据，保存初始状态');
+        saveHistoryData(services, []);
       } else {
-        console.log('[对比] ✅ 与上次检测相比，无服务状态变化');
+        // 正常对比差异
+        diffs = diffServices(historyData.currentServices, services);
+        
+        if (diffs.length > 0) {
+          console.log(`[对比] 🔍 检测到 ${diffs.length} 个服务状态变化`);
+          diffs.forEach(diff => {
+            console.log(`  - ${diff.serviceName}: ${diff.oldStatus} ➜ ${diff.newStatus}`);
+          });
+          
+          // 发送差异通知
+          await pushDiffNotification(webhookUrl, diffs);
+          
+          // 只在有差异时保存数据
+          saveHistoryData(services, diffs);
+        } else {
+          console.log('[对比] ✅ 与上次检测相比，无服务状态变化');
+          console.log('[存储] ⏭️ 数据无变化，跳过保存和提交');
+        }
       }
+    } else {
+      // 首次运行，保存初始数据
+      console.log('[存储] 📝 首次运行，保存初始数据');
+      saveHistoryData(services, []);
     }
-
-    // 保存当前数据
-    saveHistoryData(services);
 
     // 如果设置了 FORCE_REPORT=true，则强制发送报告
     const forceReport = process.env.FORCE_REPORT === 'true';

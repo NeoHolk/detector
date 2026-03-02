@@ -54,8 +54,15 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/apple.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "chore: 更新 Apple 服务状态数据 [skip ci]"
-          git push
+          
+          # 检查文件是否有变化
+          if git diff --quiet data/apple.json; then
+            echo "📭 数据无变化，跳过提交"
+          else
+            git add data/apple.json
+            git commit -m "chore: 更新 Apple 服务状态数据 [skip ci]"
+            git push
+            echo "✅ 数据变更已提交"
+          fi
 
 
