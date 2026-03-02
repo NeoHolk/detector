@@ -4,6 +4,9 @@ on:
   # 定时执行 - 每 5 分钟运行一次
   schedule:
     - cron: '*/5 * * * *'
+  # 推送到 main 分支时也触发(用于测试)
+  push:
+    branches: [ main ]
   # 允许手动触发,可选择是否强制发送报告
   workflow_dispatch:
     inputs:
