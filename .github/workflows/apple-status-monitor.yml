@@ -1,9 +1,10 @@
 name: Apple System Status Monitor
 
 on:
-  # 定时执行 - 每 5 分钟运行一次
+  # 定时执行 - 每小时的第 3、13、23、33、43、53 分钟运行
+  # 避开整点高峰期,提高执行成功率
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
   # 推送到 main 分支时也触发(用于测试)
   push:
     branches: [ main ]
@@ -22,10 +23,15 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # 允许提交代码
 
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📦 设置 Node.js
         uses: actions/setup-node@v4
@@ -43,5 +49,13 @@ jobs:
           WEBHOOK_URL: ${{ secrets.APPLE_WEBHOOK_URL }}
           FORCE_REPORT: ${{ github.event.inputs.force_report || 'false' }}
         run: npx ts-node scripts/apple-status-monitor.ts
+
+      - name: 💾 提交历史数据变更
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/apple.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: 更新 Apple 服务状态数据 [skip ci]"
+          git push
 
 

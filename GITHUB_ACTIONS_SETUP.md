@@ -76,14 +76,25 @@ git push origin main
 
 **触发推送的条件:**
 
-1. **异常警报**: 只要检测到任何服务的状态不是 `light-available`(即非 operational 状态),就立即推送通知。
-2. **健康报告**: 每天早上 9:00(北京时间)发送一次健康报告,即使所有服务正常。
-3. **手动触发**: 通过 GitHub Actions 手动触发时,可选择是否强制发送报告。
+1. **差异通知 🔄**: 检测到服务状态发生变化时,立即推送差异通知。这是最优先的通知类型。
+2. **异常警报 🚨**: 只要检测到任何服务的状态不是 `light-available`(即非 operational 状态),就立即推送通知。
+3. **健康报告 ✅**: 每天早上 9:00(北京时间)发送一次健康报告,即使所有服务正常。
+4. **手动触发**: 通过 GitHub Actions 手动触发时,可选择是否强制发送报告。
 
 检测的异常类型:
 - **❌ 停机服务** (`light-unavailable` → down)
 - **⚠️ 性能降级服务** (`light-resolved` → degraded)
 - **❓ 未知状态服务** (其他状态 → unknown)
+
+### 差异检测功能
+
+脚本会自动将每次爬取的数据与上一次的数据进行对比:
+- 历史数据通过 Git 提交到仓库，实现真正的持久化
+- GitHub Actions 自动提交 `data/apple.json` 的更新
+- 每次运行时读取 Git 仓库中的历史数据进行对比
+- 发现状态变化时立即发送差异通知
+- 差异通知模板包含: 服务名称、旧状态 → 新状态
+- 提交信息使用 `[skip ci]` 避免触发无限循环
 
 ## 🔄 修改执行频率
 
@@ -144,4 +155,46 @@ GitHub Actions 会记录每次执行的详细日志，包括：
 
 - 监控脚本：`scripts/apple-status-monitor.ts`
 - Workflow 配置：`.github/workflows/apple-status-monitor.yml`
+- 数据存储：`data/apple.json` (通过 Git 提交实现持久化)
+- 数据目录说明：`data/README.md`
+- 差异检测测试：`DIFF_DETECTION_TEST.md`
 - 本地运行：`pnpm run monitor`
+
+## 🔧 Git 提交持久化说明
+
+本项目使用 **Git 提交**来持久化历史数据:
+
+### 工作原理
+
+1. **读取数据**: 每次运行时从 Git 仓库读取 `data/apple.json`
+2. **对比差异**: 与新爬取的数据进行对比
+3. **保存数据**: 监控脚本更新 `apple.json` 文件
+4. **自动提交**: GitHub Actions 自动提交更新到仓库
+
+### 提交配置
+
+```yaml
+- name: 💾 提交历史数据变更
+  run: |
+    git config --local user.email "github-actions[bot]@users.noreply.github.com"
+    git config --local user.name "github-actions[bot]"
+    git add data/apple.json
+    git commit -m "chore: 更新 Apple 服务状态数据 [skip ci]"
+    git push
+```
+
+### 关键特性
+
+- **自动提交**: 每次监控运行后自动提交数据更新
+- **避免循环**: 使用 `[skip ci]` 标记，避免触发新的 workflow
+- **Bot 身份**: 以 `github-actions[bot]` 身份提交
+- **真正持久化**: 数据存储在 Git 历史中，永不丢失
+- **版本追溯**: 可以通过 Git 历史查看任意时刻的服务状态
+
+### 优势
+
+相比 GitHub Actions Cache:
+- ✅ **永久保存**: 不受 7 天限制
+- ✅ **版本历史**: 可追溯任意历史状态
+- ✅ **更可靠**: 不会因缓存过期而丢失数据
+- ✅ **可视化**: 可在 GitHub 提交历史中查看更新

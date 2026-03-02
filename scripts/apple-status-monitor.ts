@@ -1,5 +1,7 @@
 import { chromium } from 'playwright';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // 加载 .env 文件(仅本地开发时使用)
 dotenv.config();
@@ -7,6 +9,17 @@ dotenv.config();
 interface Service {
   serviceName: string;
   status: 'operational' | 'degraded' | 'down' | 'unknown';
+}
+
+interface HistoryData {
+  timestamp: string;
+  services: Service[];
+}
+
+interface ServiceDiff {
+  serviceName: string;
+  oldStatus: 'operational' | 'degraded' | 'down' | 'unknown';
+  newStatus: 'operational' | 'degraded' | 'down' | 'unknown';
 }
 
 async function fetchAppleStatus(): Promise<Service[]> {
@@ -69,6 +82,132 @@ async function fetchAppleStatus(): Promise<Service[]> {
   } finally {
     await browser.close();
     console.log('[监控脚本] 浏览器已关闭');
+  }
+}
+
+// 读取历史数据
+function readHistoryData(): HistoryData | null {
+  const dataPath = path.join(process.cwd(), 'data', 'apple.json');
+  try {
+    if (fs.existsSync(dataPath)) {
+      const content = fs.readFileSync(dataPath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.warn('[存储] 读取历史数据失败:', error instanceof Error ? error.message : String(error));
+  }
+  return null;
+}
+
+// 保存当前数据
+function saveHistoryData(services: Service[]): void {
+  const dataPath = path.join(process.cwd(), 'data', 'apple.json');
+  const data: HistoryData = {
+    timestamp: new Date().toISOString(),
+    services,
+  };
+  
+  try {
+    // 确保目录存在
+    const dir = path.dirname(dataPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf-8');
+    console.log(`[存储] ✅ 数据已保存到 ${dataPath}`);
+  } catch (error) {
+    console.error('[存储] ❌ 保存数据失败:', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// 对比服务状态,找出差异
+function diffServices(oldServices: Service[], newServices: Service[]): ServiceDiff[] {
+  const diffs: ServiceDiff[] = [];
+  
+  // 创建旧服务的映射,便于查找
+  const oldServicesMap = new Map<string, Service>();
+  oldServices.forEach(s => oldServicesMap.set(s.serviceName, s));
+  
+  // 遍历新服务,找出状态变化
+  newServices.forEach(newService => {
+    const oldService = oldServicesMap.get(newService.serviceName);
+    
+    if (oldService && oldService.status !== newService.status) {
+      diffs.push({
+        serviceName: newService.serviceName,
+        oldStatus: oldService.status,
+        newStatus: newService.status,
+      });
+    }
+  });
+  
+  return diffs;
+}
+
+// 发送差异通知
+async function pushDiffNotification(webhookUrl: string, diffs: ServiceDiff[]): Promise<void> {
+  console.log(`[推送] 🔄 检测到 ${diffs.length} 个服务状态变化，发送差异通知...`);
+  
+  let content = '# 🔄 Apple 服务状态变化通知\n\n';
+  content += `**检测时间**: ${new Date().toLocaleString('zh-CN')}\n`;
+  content += `**变化数量**: ${diffs.length} 个服务\n\n`;
+  content += '---\n\n';
+  
+  diffs.forEach(diff => {
+    const oldEmoji = getStatusEmoji(diff.oldStatus);
+    const newEmoji = getStatusEmoji(diff.newStatus);
+    const oldText = getStatusText(diff.oldStatus);
+    const newText = getStatusText(diff.newStatus);
+    
+    content += `**${diff.serviceName}**\n`;
+    content += `${oldEmoji} ${oldText} ➜ ${newEmoji} ${newText}\n\n`;
+  });
+  
+  content += '---\n\n';
+  content += '**数据来源**: https://developer.apple.com/system-status/\n';
+  content += `*自动生成于 ${new Date().toLocaleString('zh-CN')}*`;
+  
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        msgtype: 'markdown_v2',
+        markdown_v2: { content },
+      }),
+    });
+    
+    const result = await response.json();
+    if (response.ok && result.errcode === 0) {
+      console.log('[推送] ✅ 差异通知推送成功');
+    } else {
+      console.error('[推送] ❌ 差异通知推送失败:', result.errmsg || '未知错误');
+    }
+  } catch (error) {
+    console.error('[推送] ❌ 差异通知推送异常:', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// 获取状态对应的 emoji
+function getStatusEmoji(status: string): string {
+  switch (status) {
+    case 'operational': return '✅';
+    case 'degraded': return '⚠️';
+    case 'down': return '❌';
+    case 'unknown': return '❓';
+    default: return '❓';
+  }
+}
+
+// 获取状态对应的文本
+function getStatusText(status: string): string {
+  switch (status) {
+    case 'operational': return '正常';
+    case 'degraded': return '降级';
+    case 'down': return '停机';
+    case 'unknown': return '未知';
+    default: return '未知';
   }
 }
 
@@ -194,6 +333,14 @@ async function main() {
     console.log('========== Apple 系统状态监控 开始 ==========');
     console.log(`⏱️  执行时间: ${new Date().toLocaleString('zh-CN')}\n`);
 
+    // 读取历史数据
+    const historyData = readHistoryData();
+    if (historyData) {
+      console.log(`[存储] 📁 读取到历史数据 (${new Date(historyData.timestamp).toLocaleString('zh-CN')})`);
+    } else {
+      console.log('[存储] 📁 未找到历史数据，这是首次运行');
+    }
+
     const services = await fetchAppleStatus();
 
     if (services.length === 0) {
@@ -213,6 +360,26 @@ async function main() {
     console.log(`  ⚠️ 降级: ${stats.degraded}`);
     console.log(`  ❌ 停机: ${stats.down}`);
     console.log(`  ❓ 未知: ${stats.unknown}\n`);
+
+    // 对比历史数据,检测差异
+    if (historyData && historyData.services) {
+      const diffs = diffServices(historyData.services, services);
+      
+      if (diffs.length > 0) {
+        console.log(`[对比] 🔍 检测到 ${diffs.length} 个服务状态变化`);
+        diffs.forEach(diff => {
+          console.log(`  - ${diff.serviceName}: ${diff.oldStatus} ➜ ${diff.newStatus}`);
+        });
+        
+        // 发送差异通知
+        await pushDiffNotification(webhookUrl, diffs);
+      } else {
+        console.log('[对比] ✅ 与上次检测相比，无服务状态变化');
+      }
+    }
+
+    // 保存当前数据
+    saveHistoryData(services);
 
     // 如果设置了 FORCE_REPORT=true，则强制发送报告
     const forceReport = process.env.FORCE_REPORT === 'true';

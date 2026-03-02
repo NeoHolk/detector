@@ -69,6 +69,8 @@ npm run monitor
 ========== Apple 系统状态监控 开始 ==========
 ⏱️  执行时间: 2026-03-02 11:45:30
 
+[存储] 📁 读取到历史数据 (2026-03-02 11:40:30)
+
 [监控脚本] 启动浏览器...
 [监控脚本] 访问 Apple 状态页面...
 [监控脚本] 等待状态表格加载...
@@ -82,8 +84,20 @@ npm run monitor
   ❌ 停机: 0
   ❓ 未知: 0
 
+[对比] ✅ 与上次检测相比，无服务状态变化
+[存储] ✅ 数据已保存到 /path/to/data/apple.json
 [推送] ✅ 所有服务正常,无需推送
 ========== Apple 系统状态监控 结束 ==========
+```
+
+### 检测到状态变化时
+
+```
+[对比] 🔍 检测到 2 个服务状态变化
+  - App Store Connect: operational ➜ degraded
+  - TestFlight: operational ➜ down
+[推送] 🔄 检测到 2 个服务状态变化，发送差异通知...
+[推送] ✅ 差异通知推送成功
 ```
 
 ## 🔍 故障排查
@@ -146,7 +160,21 @@ npm install
 - `.env.example` 是模板文件,可以提交到 Git
 - 本地测试时建议使用 `FORCE_REPORT=true` 验证配置
 - GitHub Actions 使用 Secrets,不需要 `.env` 文件
+- `data/apple.json` 会被提交到 Git 仓库,实现数据持久化
+- 本地运行会直接修改 `data/apple.json`,可以手动提交或让 GitHub Actions 自动更新
+- 首次运行会创建 `data/apple.json`,后续运行会自动对比差异
+
+## 🧪 测试差异检测功能
+
+详见 [DIFF_DETECTION_TEST.md](DIFF_DETECTION_TEST.md) 文档。
+
+简要步骤:
+1. 首次运行创建基准数据
+2. 手动修改 `data/apple.json` 中的某个服务状态
+3. 再次运行,观察差异检测和通知
 
 ## 🆘 需要帮助?
 
-查看完整的 GitHub Actions 配置指南: [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md)
+- 查看完整的 GitHub Actions 配置指南: [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md)
+- 查看差异检测测试指南: [DIFF_DETECTION_TEST.md](DIFF_DETECTION_TEST.md)
+- 查看数据目录说明: [data/README.md](data/README.md)
