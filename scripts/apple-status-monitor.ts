@@ -1,4 +1,8 @@
 import { chromium } from 'playwright';
+import * as dotenv from 'dotenv';
+
+// 加载 .env 文件(仅本地开发时使用)
+dotenv.config();
 
 interface Service {
   serviceName: string;
