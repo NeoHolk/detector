@@ -1,0 +1,16 @@
+{
+  "name": "apple-status-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "monitor": "ts-node scripts/apple-status-monitor.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "ts-node": "^10.9.0",
+    "typescript": "^5"
+  }
+}

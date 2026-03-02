@@ -1,0 +1,44 @@
+name: Apple System Status Monitor
+
+on:
+  # 定时执行 - 每 5 分钟运行一次
+  schedule:
+    - cron: '*/5 * * * *'
+  # 允许手动触发,可选择是否强制发送报告
+  workflow_dispatch:
+    inputs:
+      force_report:
+        description: '强制发送报告(即使所有服务正常)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 📦 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 📦 安装依赖
+        run: npm install
+
+      - name: 🎭 安装 Playwright
+        run: npx playwright install chromium
+
+      - name: 🚀 运行 Apple 状态监控
+        env:
+          WEBHOOK_URL: ${{ secrets.APPLE_WEBHOOK_URL }}
+          FORCE_REPORT: ${{ github.event.inputs.force_report || 'false' }}
+        run: npx ts-node scripts/apple-status-monitor.ts
+
+
