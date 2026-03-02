@@ -197,8 +197,12 @@ function diffServices(oldServices: Service[], newServices: Service[]): ServiceDi
 async function pushDiffNotification(webhookUrl: string, diffs: ServiceDiff[]): Promise<void> {
   console.log(`[推送] 🔄 检测到 ${diffs.length} 个服务状态变化，发送差异通知...`);
   
+  // 企业微信 markdown_v2 内容限制为 4096 字节
+  const MAX_BYTES = 4096;
+  
+  const now = new Date().toLocaleString('zh-CN');
   let content = '# 🔄 Apple 服务状态变化通知\n\n';
-  content += `**检测时间**: ${new Date().toLocaleString('zh-CN')}\n`;
+  content += `**检测时间**: ${now}\n`;
   content += `**变化数量**: ${diffs.length} 个服务\n\n`;
   content += '---\n\n';
   
@@ -214,7 +218,43 @@ async function pushDiffNotification(webhookUrl: string, diffs: ServiceDiff[]): P
   
   content += '---\n\n';
   content += '**数据来源**: https://developer.apple.com/system-status/\n';
-  content += `*自动生成于 ${new Date().toLocaleString('zh-CN')}*`;
+  content += `*自动生成于 ${now}*`;
+  
+  // 检查字节长度
+  const contentBytes = Buffer.byteLength(content, 'utf8');
+  console.log(`[推送] 📊 通知内容: ${content.length} 字符 / ${contentBytes} 字节`);
+  
+  // 如果超过限制，进行截断
+  if (contentBytes > MAX_BYTES) {
+    console.log(`[推送] ⚠️ 内容超过 ${MAX_BYTES} 字节限制，进行截断...`);
+    const footer = '\n\n---\n\n**数据来源**: https://developer.apple.com/system-status/\n' + `*自动生成于 ${now}*`;
+    const truncationNotice = '\n\n*...(内容过长已截断)*';
+    const header = content.substring(0, content.indexOf('---\n\n') + 6);
+    
+    // 计算可用空间
+    const availableBytes = MAX_BYTES - Buffer.byteLength(header + footer + truncationNotice, 'utf8');
+    
+    // 逐个添加变化项，直到超出限制
+    let diffContent = '';
+    let diffBytes = 0;
+    for (const diff of diffs) {
+      const oldEmoji = getStatusEmoji(diff.oldStatus);
+      const newEmoji = getStatusEmoji(diff.newStatus);
+      const oldText = getStatusText(diff.oldStatus);
+      const newText = getStatusText(diff.newStatus);
+      const diffLine = `**${diff.serviceName}**\n${oldEmoji} ${oldText} ➜ ${newEmoji} ${newText}\n\n`;
+      const lineBytes = Buffer.byteLength(diffLine, 'utf8');
+      
+      if (diffBytes + lineBytes > availableBytes) break;
+      
+      diffContent += diffLine;
+      diffBytes += lineBytes;
+    }
+    
+    content = header + diffContent + truncationNotice + footer;
+    const finalBytes = Buffer.byteLength(content, 'utf8');
+    console.log(`[推送] 📊 截断后: ${content.length} 字符 / ${finalBytes} 字节`);
+  }
   
   try {
     const response = await fetch(webhookUrl, {
@@ -314,12 +354,16 @@ async function pushToWeChat(webhookUrl: string, services: Service[], forceReport
 
   console.log(`[推送] 🚨 检测到 ${abnormalServices.length} 个异常服务，开始推送...`);
 
+  // 企业微信 markdown_v2 内容限制为 4096 字节
+  const MAX_BYTES = 4096;
+  
   const downServices = abnormalServices.filter(s => s.status === 'down');
   const degradedServices = abnormalServices.filter(s => s.status === 'degraded');
   const unknownServices = abnormalServices.filter(s => s.status === 'unknown');
 
+  const nowStr = now.toLocaleString('zh-CN');
   let content = '# 🚨 Apple 服务异常警报\n\n';
-  content += `**检测时间**: ${new Date().toLocaleString('zh-CN')}\n\n`;
+  content += `**检测时间**: ${nowStr}\n\n`;
 
   if (downServices.length > 0) {
     content += '## ❌ 停机服务\n';
@@ -347,7 +391,88 @@ async function pushToWeChat(webhookUrl: string, services: Service[], forceReport
 
   content += '---\n\n';
   content += '**数据来源**: https://developer.apple.com/system-status/\n';
-  content += `*自动生成于 ${new Date().toLocaleString('zh-CN')}*`;
+  content += `*自动生成于 ${nowStr}*`;
+
+  // 检查字节长度
+  const contentBytes = Buffer.byteLength(content, 'utf8');
+  console.log(`[推送] 📊 通知内容: ${content.length} 字符 / ${contentBytes} 字节`);
+  
+  // 如果超过限制，进行截断
+  if (contentBytes > MAX_BYTES) {
+    console.log(`[推送] ⚠️ 内容超过 ${MAX_BYTES} 字节限制，进行截断...`);
+    const footer = '\n\n---\n\n**数据来源**: https://developer.apple.com/system-status/\n' + `*自动生成于 ${nowStr}*`;
+    const truncationNotice = '\n\n*...(内容过长已截断)*';
+    const header = `# 🚨 Apple 服务异常警报\n\n**检测时间**: ${nowStr}\n\n`;
+    
+    // 计算可用空间
+    const availableBytes = MAX_BYTES - Buffer.byteLength(header + footer + truncationNotice, 'utf8');
+    
+    // 重新构建内容，按优先级添加
+    let serviceContent = '';
+    let serviceBytes = 0;
+    
+    // 优先添加停机服务
+    if (downServices.length > 0) {
+      const section = '## ❌ 停机服务\n';
+      const sectionBytes = Buffer.byteLength(section, 'utf8');
+      if (serviceBytes + sectionBytes < availableBytes) {
+        serviceContent += section;
+        serviceBytes += sectionBytes;
+        
+        for (const s of downServices) {
+          const line = `❌ ${s.serviceName}\n`;
+          const lineBytes = Buffer.byteLength(line, 'utf8');
+          if (serviceBytes + lineBytes > availableBytes) break;
+          serviceContent += line;
+          serviceBytes += lineBytes;
+        }
+        serviceContent += '\n';
+        serviceBytes += 1;
+      }
+    }
+    
+    // 然后添加降级服务
+    if (degradedServices.length > 0 && serviceBytes < availableBytes) {
+      const section = '## ⚠️ 性能降级服务\n';
+      const sectionBytes = Buffer.byteLength(section, 'utf8');
+      if (serviceBytes + sectionBytes < availableBytes) {
+        serviceContent += section;
+        serviceBytes += sectionBytes;
+        
+        for (const s of degradedServices) {
+          const line = `⚠️ ${s.serviceName}\n`;
+          const lineBytes = Buffer.byteLength(line, 'utf8');
+          if (serviceBytes + lineBytes > availableBytes) break;
+          serviceContent += line;
+          serviceBytes += lineBytes;
+        }
+        serviceContent += '\n';
+        serviceBytes += 1;
+      }
+    }
+    
+    // 最后添加未知状态服务
+    if (unknownServices.length > 0 && serviceBytes < availableBytes) {
+      const section = '## ❓ 未知状态服务\n';
+      const sectionBytes = Buffer.byteLength(section, 'utf8');
+      if (serviceBytes + sectionBytes < availableBytes) {
+        serviceContent += section;
+        serviceBytes += sectionBytes;
+        
+        for (const s of unknownServices) {
+          const line = `❓ ${s.serviceName}\n`;
+          const lineBytes = Buffer.byteLength(line, 'utf8');
+          if (serviceBytes + lineBytes > availableBytes) break;
+          serviceContent += line;
+          serviceBytes += lineBytes;
+        }
+      }
+    }
+    
+    content = header + serviceContent + truncationNotice + footer;
+    const finalBytes = Buffer.byteLength(content, 'utf8');
+    console.log(`[推送] 📊 截断后: ${content.length} 字符 / ${finalBytes} 字节`);
+  }
 
   try {
     const response = await fetch(webhookUrl, {
