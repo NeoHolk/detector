@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "monitor": "ts-node scripts/apple-status-monitor.ts"
+    "apple": "ts-node scripts/apple-status-monitor.ts",
+    "weixin": "ts-node scripts/weixin-minigame-monitor.ts"
   },
   "dependencies": {
+    "@types/turndown": "^5.0.6",
     "dotenv": "^16.4.5",
-    "playwright": "^1.58.2"
+    "playwright": "^1.58.2",
+    "turndown": "^7.2.2"
   },
   "devDependencies": {
     "@types/node": "^20",

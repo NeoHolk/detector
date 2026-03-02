@@ -1,0 +1,67 @@
+name: Weixin Minigame Update Monitor
+
+on:
+  # 定时执行 - 每小时的第 8、28、48 分钟运行
+  schedule:
+    - cron: '8,28,48 * * * *'
+  # 推送到 main 分支时也触发(用于测试)
+  # push:
+  #   branches: [ main ]
+  # 允许手动触发,可选择是否强制发送报告
+  workflow_dispatch:
+    inputs:
+      force_report:
+        description: '强制发送报告'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 📦 安装依赖
+        run: npm install
+        # 包含: playwright, turndown (HTML转Markdown), dotenv, typescript
+
+      - name: 🎭 安装 Playwright
+        run: npx playwright install chromium
+
+      - name: 🚀 运行微信小游戏更新监控
+        env:
+          WEBHOOK_URL: ${{ secrets.WEIXIN_WEBHOOK_URL }}
+          FORCE_REPORT: ${{ github.event.inputs.force_report || 'false' }}
+        run: npx ts-node scripts/weixin-minigame-monitor.ts
+
+      - name: 💾 提交历史数据变更
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 检查文件是否有变化
+          if git diff --quiet data/weixin-minigame.json; then
+            echo "📭 数据无变化，跳过提交"
+          else
+            git add data/weixin-minigame.json
+            git commit -m "chore: 更新微信小游戏日志数据 [skip ci]"
+            git push
+            echo "✅ 数据变更已提交"
+          fi
+
